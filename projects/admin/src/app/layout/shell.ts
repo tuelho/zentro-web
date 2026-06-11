@@ -22,6 +22,7 @@ const LOJISTA_MENU: MenuItem[] = [
 
 const PLATFORM_MENU: MenuItem[] = [
   { label: 'Plataforma', icon: 'pi pi-building', link: '/plataforma' },
+  { label: 'Administradores', icon: 'pi pi-user-edit', link: '/administradores' },
 ];
 
 @Component({

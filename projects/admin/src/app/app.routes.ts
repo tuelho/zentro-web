@@ -60,6 +60,11 @@ export const routes: Routes = [
         canActivate: [platformGuard],
         loadComponent: () => import('./pages/plataforma').then((m) => m.PlataformaPage),
       },
+      {
+        path: 'administradores',
+        canActivate: [platformGuard],
+        loadComponent: () => import('./pages/administradores').then((m) => m.AdministradoresPage),
+      },
     ],
   },
   { path: '**', redirectTo: 'dashboard' },

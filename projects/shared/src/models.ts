@@ -406,6 +406,12 @@ export interface TenantOverview {
   salesToday: number;
 }
 
+export interface PlatformAdminRow {
+  id: number;
+  name: string;
+  email: string;
+}
+
 export interface DomainDetail {
   id: number;
   domain: string;

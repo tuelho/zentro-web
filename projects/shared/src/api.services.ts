@@ -6,7 +6,7 @@ import {
   CustomerDetail, CustomerRow, Dashboard, DeliveryView, ImageMetaDto, LoginResponse,
   LowStockItem, MovementResponse, MovementType, OrderResponse, OrderStatus, Page,
   ProductCard, ProductDetail, ProductRequest, ProductResponse, SalesRow, SettingsDto,
-  StoreInfo, TenantDetail, TenantOverview, TenantRow, TenantUserRow,
+  PlatformAdminRow, StoreInfo, TenantDetail, TenantOverview, TenantRow, TenantUserRow,
 } from './models';
 
 function params(obj: Record<string, unknown>): HttpParams {
@@ -254,5 +254,22 @@ export class PlatformApi {
   }
   overview(): Observable<TenantOverview[]> {
     return this.http.get<TenantOverview[]>('/api/platform/overview');
+  }
+
+  // administradores da plataforma
+  admins(): Observable<PlatformAdminRow[]> {
+    return this.http.get<PlatformAdminRow[]>('/api/platform/admins');
+  }
+  createAdmin(data: { name: string; email: string; password: string }): Observable<PlatformAdminRow> {
+    return this.http.post<PlatformAdminRow>('/api/platform/admins', data);
+  }
+  updateAdmin(id: number, data: { name: string; email: string }): Observable<PlatformAdminRow> {
+    return this.http.put<PlatformAdminRow>(`/api/platform/admins/${id}`, data);
+  }
+  changeAdminPassword(id: number, password: string): Observable<void> {
+    return this.http.post<void>(`/api/platform/admins/${id}/password`, { password });
+  }
+  deleteAdmin(id: number): Observable<void> {
+    return this.http.delete<void>(`/api/platform/admins/${id}`);
   }
 }
