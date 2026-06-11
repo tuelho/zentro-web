@@ -649,13 +649,25 @@ export class ProdutosPage implements OnInit {
         })),
     };
 
+    const isNew = !this.editing();
     this.saving.set(true);
     this.api.saveProduct(this.editing()?.id ?? null, request).subscribe({
-      next: () => {
+      next: (saved) => {
         this.saving.set(false);
-        this.dialogVisible = false;
-        this.toast.add({ severity: 'success', summary: 'Produto salvo' });
         this.fetch();
+        if (isNew) {
+          // mantem o dialog aberto em modo edicao para enviar as fotos do produto recem-criado
+          this.openEdit(saved);
+          this.toast.add({
+            severity: 'success',
+            summary: 'Produto criado',
+            detail: 'Agora adicione as fotos do produto na seção abaixo.',
+            life: 6000,
+          });
+        } else {
+          this.dialogVisible = false;
+          this.toast.add({ severity: 'success', summary: 'Produto salvo' });
+        }
       },
       error: (err) => {
         this.saving.set(false);

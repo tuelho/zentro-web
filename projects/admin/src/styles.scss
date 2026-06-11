@@ -317,6 +317,38 @@ body {
   width: 100%;
 }
 
+/* permite que as celulas do grid encolham (evita "blowout" e rolagem horizontal) */
+.form-grid > * {
+  min-width: 0;
+}
+
+/* componentes PrimeNG (inputnumber/select/datepicker) preenchem a celula */
+.field p-inputnumber,
+.field p-select,
+.field p-datepicker,
+.field p-multiselect {
+  display: block;
+  width: 100%;
+}
+
+.field :is(.p-inputnumber, .p-select, .p-datepicker, .p-multiselect, .p-inputtext),
+.field .p-inputnumber input,
+.field .p-datepicker input {
+  width: 100%;
+}
+
+/* em telas estreitas (dialog em mobile) os campos finos ganham mais largura */
+@media (max-width: 640px) {
+  .form-grid .f-2,
+  .form-grid .f-3,
+  .form-grid .f-4 {
+    grid-column: span 6;
+  }
+  .form-grid .f-8 {
+    grid-column: span 12;
+  }
+}
+
 .field-inline {
   display: flex;
   align-items: center;
