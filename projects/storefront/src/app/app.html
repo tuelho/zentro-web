@@ -30,10 +30,12 @@
 
       <nav class="sf-nav">
         <a routerLink="/carrinho" class="sf-cart" aria-label="Carrinho">
-          <i class="pi pi-shopping-cart"></i>
-          @if (cart.count() > 0) {
-            <span class="sf-cart-badge">{{ cart.count() }}</span>
-          }
+          <span class="sf-cart-icon">
+            <i class="pi pi-shopping-cart"></i>
+            @if (cart.count() > 0) {
+              <span class="sf-cart-badge">{{ cart.count() }}</span>
+            }
+          </span>
           <span class="sf-nav-label">Carrinho</span>
         </a>
         <a routerLink="/conta">
