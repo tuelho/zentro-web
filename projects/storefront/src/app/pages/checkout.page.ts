@@ -181,7 +181,7 @@ type DeliveryType = 'ENTREGA' | 'RETIRADA';
                     <input
                       pInputText
                       [(ngModel)]="cep"
-                      (blur)="onCep()"
+                      (ngModelChange)="cepChanged()"
                       (keyup.enter)="onCep()"
                       placeholder="00000-000"
                       inputmode="numeric"
@@ -688,15 +688,28 @@ export class CheckoutPage {
     });
   }
 
-  /** Busca o endereco pelo CEP (ViaCEP) e preenche os campos. */
+  private lastCep = '';
+
+  /** Dispara a busca automaticamente quando o CEP fica completo (8 digitos). */
+  protected cepChanged(): void {
+    const digits = this.cep.replace(/\D/g, '');
+    if (digits.length === 8 && digits !== this.lastCep) {
+      this.onCep();
+    } else if (digits.length < 8) {
+      this.lastCep = '';
+    }
+  }
+
+  /** Busca o endereco pelo CEP (ViaCEP), preenche os campos e posiciona o pin no mapa. */
   protected onCep(): void {
     const digits = this.cep.replace(/\D/g, '');
     if (digits.length !== 8) return;
+    this.lastCep = digits;
     this.cep = digits.replace(/(\d{5})(\d{3})/, '$1-$2');
     this.cepLoading.set(true);
     this.geo.lookupCep(digits).subscribe((r) => {
-      this.cepLoading.set(false);
       if (!r) {
+        this.cepLoading.set(false);
         this.messages.add({ severity: 'warn', summary: 'CEP não encontrado' });
         return;
       }
@@ -704,6 +717,16 @@ export class CheckoutPage {
       if (r.district) this.district = r.district;
       if (r.city) this.city = r.city;
       if (r.state) this.state = this.uf(r.state);
+      // posiciona o pin no mapa a partir do endereco do CEP
+      this.geo
+        .geocodeAddress({ street: r.street, city: r.city, state: r.state, zip: digits })
+        .subscribe((pos) => {
+          this.cepLoading.set(false);
+          if (pos) {
+            this.lat.set(pos.lat);
+            this.lng.set(pos.lng);
+          }
+        });
     });
   }
 
