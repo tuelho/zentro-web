@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { PlatformApi, TenantDetail, TenantOverview, TenantRow, TenantUserRow } from '@zentro/shared';
+import { PlatformApi, TenantDetail, TenantOverview, TenantRow } from '@zentro/shared';
+import { Observable, forkJoin } from 'rxjs';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
@@ -189,17 +190,6 @@ import { errMessage } from '../core/ui';
             />
           </div>
         </div>
-        <div style="margin: 0.2rem 0 0.8rem">
-          <p-button
-            label="Salvar dados"
-            icon="pi pi-save"
-            size="small"
-            [loading]="savingTenant()"
-            [disabled]="!editForm.name"
-            (onClick)="saveTenant(t.id)"
-          />
-        </div>
-
         <!-- Domínios -->
         <h3 class="edit-section">Domínios</h3>
         <div class="dom-list">
@@ -248,38 +238,44 @@ import { errMessage } from '../core/ui';
 
         <!-- Lojistas -->
         <h3 class="edit-section">Usuários lojistas</h3>
-        @for (u of t.users; track u.id) {
-          <div class="user-edit">
-            <div class="form-grid" style="flex:1">
-              <div class="field f-6" style="grid-column: span 6">
-                <label>Nome</label>
-                <input pInputText type="text" [(ngModel)]="u.name" />
-              </div>
-              <div class="field f-6" style="grid-column: span 6">
-                <label>E-mail (login)</label>
-                <input pInputText type="email" [(ngModel)]="u.email" />
-              </div>
+        @for (u of editUsers; track u.id) {
+          <div class="form-grid user-row">
+            <div class="field f-4" style="grid-column: span 4">
+              <label>Nome</label>
+              <input pInputText type="text" [(ngModel)]="u.name" />
             </div>
-            <div class="user-actions">
-              <label class="active-check">
-                <p-checkbox [(ngModel)]="u.active" [binary]="true" /> Ativo
-              </label>
-              <p-button label="Salvar" icon="pi pi-save" size="small" (onClick)="saveUser(t.id, u)" />
-              <p-button
-                label="Redefinir senha"
-                icon="pi pi-key"
-                size="small"
-                severity="secondary"
-                [outlined]="true"
-                (onClick)="openPassword(t.id, u)"
-              />
+            <div class="field f-6" style="grid-column: span 6">
+              <label>E-mail (login)</label>
+              <input pInputText type="email" [(ngModel)]="u.email" />
+            </div>
+            <div class="field-inline f-2" style="grid-column: span 2">
+              <p-checkbox [binary]="true" [(ngModel)]="u.active" [inputId]="'uactive' + u.id" />
+              <label [for]="'uactive' + u.id">Ativo</label>
             </div>
           </div>
         }
+
+        <div class="dialog-footer" style="display:flex; align-items:center; gap:0.5rem; margin-top:1.2rem">
+          <p-button label="Fechar" severity="secondary" [text]="true" (onClick)="editVisible = false" />
+          <span style="flex:1"></span>
+          @if (editUsers.length) {
+            <p-button
+              label="Redefinir senha"
+              icon="pi pi-key"
+              severity="secondary"
+              [outlined]="true"
+              (onClick)="openPassword(t.id, editUsers[0].id, editUsers[0].name)"
+            />
+          }
+          <p-button
+            label="Salvar"
+            icon="pi pi-check"
+            [loading]="savingTenant()"
+            [disabled]="!editForm.name"
+            (onClick)="saveAll(t.id)"
+          />
+        </div>
       }
-      <div class="dialog-footer">
-        <p-button label="Fechar" severity="secondary" [text]="true" (onClick)="editVisible = false" />
-      </div>
     </p-dialog>
 
     <!-- ====================== Redefinir senha ====================== -->
@@ -335,25 +331,11 @@ import { errMessage } from '../core/ui';
         gap: 0.5rem;
         margin-top: 0.6rem;
       }
-      .user-edit {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.6rem;
-        align-items: flex-end;
-        padding: 0.6rem 0;
-        border-bottom: 1px dashed var(--z-gray);
+      .user-row {
+        padding: 0.5rem 0;
       }
-      .user-actions {
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-        flex-wrap: wrap;
-      }
-      .active-check {
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-        font-size: 0.85rem;
+      .user-row + .user-row {
+        border-top: 1px dashed var(--z-gray);
       }
     `,
   ],
@@ -375,6 +357,7 @@ export class PlataformaPage implements OnInit {
   readonly editing = signal<TenantDetail | null>(null);
   editVisible = false;
   editForm = { name: '', themeColor: '#2563EB' };
+  editUsers: { id: number; name: string; email: string; active: boolean }[] = [];
   newDomain = '';
   readonly savingTenant = signal(false);
 
@@ -450,30 +433,42 @@ export class PlataformaPage implements OnInit {
 
   openEdit(t: TenantRow): void {
     this.newDomain = '';
+    this.editUsers = [];
     this.editVisible = true;
     this.editing.set(null);
     this.api.getTenant(t.id).subscribe({
-      next: (d) => {
-        this.editForm = { name: d.name, themeColor: d.themeColor ?? '#2563EB' };
-        this.editing.set(d);
-      },
+      next: (d) => this.loadDetail(d),
       error: (err) =>
         this.toast.add({ severity: 'error', summary: 'Erro', detail: errMessage(err) }),
     });
   }
 
+  private loadDetail(d: TenantDetail): void {
+    this.editForm = { name: d.name, themeColor: d.themeColor ?? '#2563EB' };
+    this.editUsers = d.users.map((u) => ({ id: u.id, name: u.name, email: u.email, active: u.active }));
+    this.editing.set(d);
+  }
+
+  /** Atualiza a lista de dominios (apos add/remover/principal) sem perder o que o usuario digitou nos campos. */
   private applyDetail(d: TenantDetail): void {
     this.editing.set(d);
     this.reload();
   }
 
-  saveTenant(id: number): void {
+  /** Salva tudo de uma vez: dados da loja + lojistas. */
+  saveAll(id: number): void {
     this.savingTenant.set(true);
-    this.api.updateTenant(id, { name: this.editForm.name, themeColor: this.editForm.themeColor }).subscribe({
-      next: (d) => {
+    const calls: Observable<unknown>[] = [
+      this.api.updateTenant(id, { name: this.editForm.name, themeColor: this.editForm.themeColor }),
+      ...this.editUsers.map((u) =>
+        this.api.updateTenantUser(id, u.id, { name: u.name, email: u.email, active: u.active })),
+    ];
+    forkJoin(calls).subscribe({
+      next: () => {
         this.savingTenant.set(false);
-        this.applyDetail(d);
-        this.toast.add({ severity: 'success', summary: 'Dados atualizados' });
+        this.toast.add({ severity: 'success', summary: 'Alterações salvas' });
+        this.reload();
+        this.api.getTenant(id).subscribe((d) => this.loadDetail(d));
       },
       error: (err) => {
         this.savingTenant.set(false);
@@ -526,18 +521,10 @@ export class PlataformaPage implements OnInit {
     });
   }
 
-  saveUser(id: number, u: TenantUserRow): void {
-    this.api.updateTenantUser(id, u.id, { name: u.name, email: u.email, active: u.active }).subscribe({
-      next: () => this.toast.add({ severity: 'success', summary: 'Lojista atualizado' }),
-      error: (err) =>
-        this.toast.add({ severity: 'error', summary: 'Erro', detail: errMessage(err) }),
-    });
-  }
-
-  openPassword(id: number, u: TenantUserRow): void {
-    this.pwTenantId = id;
-    this.pwUserId = u.id;
-    this.pwUserName = u.name;
+  openPassword(tenantId: number, userId: number, userName: string): void {
+    this.pwTenantId = tenantId;
+    this.pwUserId = userId;
+    this.pwUserName = userName;
     this.newPassword = '';
     this.passwordVisible = true;
   }
