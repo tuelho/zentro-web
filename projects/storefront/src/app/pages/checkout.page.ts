@@ -6,6 +6,7 @@ import {
   AuthApi,
   AuthService,
   CheckoutRequest,
+  GeoService,
   StoreApi,
   ZMap,
 } from '@zentro/shared';
@@ -173,14 +174,50 @@ type DeliveryType = 'ENTREGA' | 'RETIRADA';
             />
 
             <div class="form address-form">
-              <label>
-                Bairro
-                <input pInputText [(ngModel)]="district" placeholder="Ex.: Centro" />
-              </label>
-              <label>
-                Cidade
-                <input pInputText [(ngModel)]="city" placeholder="Ex.: Uberlândia" />
-              </label>
+              <div class="addr-row">
+                <label class="cep-field">
+                  CEP
+                  <span class="cep-input">
+                    <input
+                      pInputText
+                      [(ngModel)]="cep"
+                      (blur)="onCep()"
+                      (keyup.enter)="onCep()"
+                      placeholder="00000-000"
+                      inputmode="numeric"
+                      maxlength="9"
+                    />
+                    @if (cepLoading()) {
+                      <i class="pi pi-spin pi-spinner"></i>
+                    }
+                  </span>
+                  <span class="z-muted small">Preenche o endereço automaticamente.</span>
+                </label>
+              </div>
+              <div class="addr-row">
+                <label class="grow-2">
+                  Rua / Logradouro
+                  <input pInputText [(ngModel)]="street" placeholder="Ex.: Rua das Flores" />
+                </label>
+                <label class="num">
+                  Número
+                  <input pInputText [(ngModel)]="number" placeholder="s/n" />
+                </label>
+              </div>
+              <div class="addr-row">
+                <label class="grow-2">
+                  Bairro
+                  <input pInputText [(ngModel)]="district" placeholder="Ex.: Centro" />
+                </label>
+                <label class="grow-2">
+                  Cidade
+                  <input pInputText [(ngModel)]="city" placeholder="Ex.: Uberlândia" />
+                </label>
+                <label class="uf">
+                  UF
+                  <input pInputText [(ngModel)]="state" placeholder="MG" maxlength="2" />
+                </label>
+              </div>
               <label class="highlight">
                 Ponto de referência
                 <input
@@ -450,6 +487,43 @@ type DeliveryType = 'ENTREGA' | 'RETIRADA';
       .address-form {
         margin-top: 1rem;
       }
+      .addr-row {
+        display: flex;
+        gap: 0.8rem;
+      }
+      .addr-row > label {
+        flex: 1;
+      }
+      .addr-row .grow-2 {
+        flex: 2;
+      }
+      .addr-row .num {
+        flex: 0 0 90px;
+      }
+      .addr-row .uf {
+        flex: 0 0 70px;
+      }
+      .cep-field {
+        max-width: 220px;
+      }
+      .cep-input {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      .cep-input input {
+        width: 100%;
+      }
+      .cep-input .pi-spinner {
+        position: absolute;
+        right: 0.6rem;
+        color: var(--z-blue);
+      }
+      @media (max-width: 480px) {
+        .addr-row {
+          flex-wrap: wrap;
+        }
+      }
       .highlight {
         background: color-mix(in srgb, var(--z-green) 12%, transparent);
         border: 1px dashed var(--z-green);
@@ -503,6 +577,7 @@ export class CheckoutPage {
   private readonly storeSvc = inject(StoreService);
   private readonly storeApi = inject(StoreApi);
   private readonly authApi = inject(AuthApi);
+  private readonly geo = inject(GeoService);
   private readonly messages = inject(MessageService);
   private readonly router = inject(Router);
 
@@ -527,9 +602,14 @@ export class CheckoutPage {
   protected deliveryType: DeliveryType = 'ENTREGA';
   protected readonly lat = signal(-18.91);
   protected readonly lng = signal(-48.26);
+  protected cep = '';
+  protected street = '';
+  protected number = '';
   protected district = '';
   protected city = '';
+  protected state = '';
   protected reference = '';
+  protected readonly cepLoading = signal(false);
 
   // revisao
   protected customerNote = '';
@@ -597,6 +677,54 @@ export class CheckoutPage {
   protected onPosition(pos: { lat: number; lng: number }): void {
     this.lat.set(pos.lat);
     this.lng.set(pos.lng);
+    // geocodificacao reversa: preenche os campos a partir do pin
+    this.geo.reverseGeocode(pos.lat, pos.lng).subscribe((r) => {
+      if (!r) return;
+      if (r.street) this.street = r.street;
+      if (r.district) this.district = r.district;
+      if (r.city) this.city = r.city;
+      if (r.state) this.state = this.uf(r.state);
+      if (r.zip && !this.cep.trim()) this.cep = r.zip;
+    });
+  }
+
+  /** Busca o endereco pelo CEP (ViaCEP) e preenche os campos. */
+  protected onCep(): void {
+    const digits = this.cep.replace(/\D/g, '');
+    if (digits.length !== 8) return;
+    this.cep = digits.replace(/(\d{5})(\d{3})/, '$1-$2');
+    this.cepLoading.set(true);
+    this.geo.lookupCep(digits).subscribe((r) => {
+      this.cepLoading.set(false);
+      if (!r) {
+        this.messages.add({ severity: 'warn', summary: 'CEP não encontrado' });
+        return;
+      }
+      if (r.street) this.street = r.street;
+      if (r.district) this.district = r.district;
+      if (r.city) this.city = r.city;
+      if (r.state) this.state = this.uf(r.state);
+    });
+  }
+
+  /** Normaliza o estado para a sigla de 2 letras (Nominatim devolve o nome completo). */
+  private uf(state: string): string {
+    if (state.length === 2) return state.toUpperCase();
+    const map: Record<string, string> = {
+      acre: 'AC', alagoas: 'AL', amapa: 'AP', amazonas: 'AM', bahia: 'BA',
+      ceara: 'CE', 'distrito federal': 'DF', 'espirito santo': 'ES', goias: 'GO',
+      maranhao: 'MA', 'mato grosso': 'MT', 'mato grosso do sul': 'MS',
+      'minas gerais': 'MG', para: 'PA', paraiba: 'PB', parana: 'PR',
+      pernambuco: 'PE', piaui: 'PI', 'rio de janeiro': 'RJ',
+      'rio grande do norte': 'RN', 'rio grande do sul': 'RS', rondonia: 'RO',
+      roraima: 'RR', 'santa catarina': 'SC', 'sao paulo': 'SP', sergipe: 'SE',
+      tocantins: 'TO',
+    };
+    const key = state
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '');
+    return map[key] ?? state;
   }
 
   protected useMyLocation(): void {
@@ -625,8 +753,13 @@ export class CheckoutPage {
       address:
         this.deliveryType === 'ENTREGA'
           ? {
+              label: 'Entrega',
+              street: this.street.trim() || undefined,
+              number: this.number.trim() || undefined,
               district: this.district.trim() || undefined,
               city: this.city.trim() || undefined,
+              state: this.state.trim() || undefined,
+              zip: this.cep.replace(/\D/g, '') || undefined,
               reference: this.reference.trim() || undefined,
               latitude: this.lat(),
               longitude: this.lng(),

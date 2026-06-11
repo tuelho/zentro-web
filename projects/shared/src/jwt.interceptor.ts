@@ -10,8 +10,10 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
+  // nao anexa o token em URLs externas (ViaCEP, Nominatim, etc.)
+  const external = /^https?:\/\//i.test(req.url);
   const token = auth.token();
-  const request = token
+  const request = token && !external
     ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
     : req;
 
