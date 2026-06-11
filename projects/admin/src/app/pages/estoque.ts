@@ -87,7 +87,7 @@ const MOVEMENT_LABELS: Record<string, string> = {
               />
             </div>
           }
-          <div class="field f-2">
+          <div class="field f-3">
             <label for="mtype">Tipo *</label>
             <p-select
               inputId="mtype"

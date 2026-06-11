@@ -322,16 +322,16 @@ body {
   min-width: 0;
 }
 
-/* componentes PrimeNG (inputnumber/select/datepicker) preenchem a celula */
+/* componentes PrimeNG preenchem a celula SEM quebrar o layout interno:
+   o host desses componentes ja eh flex, entao so ajustamos a largura
+   (forcar display:block faz o label e o chevron empilharem) */
 .field p-inputnumber,
 .field p-select,
 .field p-datepicker,
 .field p-multiselect {
-  display: block;
   width: 100%;
 }
 
-.field :is(.p-inputnumber, .p-select, .p-datepicker, .p-multiselect, .p-inputtext),
 .field .p-inputnumber input,
 .field .p-datepicker input {
   width: 100%;
