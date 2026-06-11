@@ -76,7 +76,7 @@ type DeliveryType = 'ENTREGA' | 'RETIRADA';
                 [class.active]="identMode() === 'guest'"
                 (click)="identMode.set('guest')"
               >
-                Continuar sem conta
+                Criar conta
               </button>
               <button
                 type="button"
@@ -106,6 +106,16 @@ type DeliveryType = 'ENTREGA' | 'RETIRADA';
                   Telefone / WhatsApp
                   <input pInputText [(ngModel)]="guestPhone" placeholder="(34) 99999-9999" />
                 </label>
+                <label>
+                  Senha *
+                  <input
+                    pInputText
+                    type="password"
+                    [(ngModel)]="guestPassword"
+                    placeholder="mínimo de 6 caracteres"
+                  />
+                  <span class="z-muted small">Você usará para acompanhar seus pedidos depois.</span>
+                </label>
               </div>
             } @else {
               <div class="form">
@@ -129,7 +139,13 @@ type DeliveryType = 'ENTREGA' | 'RETIRADA';
 
           <div class="nav-row">
             <span></span>
-            <p-button label="Continuar" icon="pi pi-arrow-right" iconPos="right" (onClick)="toStep2()" />
+            <p-button
+              [label]="!auth.isLoggedIn() && identMode() === 'guest' ? 'Criar conta e continuar' : 'Continuar'"
+              icon="pi pi-arrow-right"
+              iconPos="right"
+              [loading]="registering()"
+              (onClick)="toStep2()"
+            />
           </div>
         </section>
       }
@@ -589,10 +605,12 @@ export class CheckoutPage {
   protected readonly loggingIn = signal(false);
   protected readonly submitting = signal(false);
 
-  // identificacao (convidado)
+  // identificacao (criar conta)
   protected guestName = '';
   protected guestEmail = '';
   protected guestPhone = '';
+  protected guestPassword = '';
+  protected readonly registering = signal(false);
 
   // login
   protected loginEmail = '';
@@ -650,24 +668,59 @@ export class CheckoutPage {
   }
 
   protected toStep2(): void {
-    if (!this.auth.isLoggedIn()) {
-      if (this.identMode() === 'login') {
-        this.messages.add({
-          severity: 'warn',
-          summary: 'Faça login ou continue sem conta',
-        });
-        return;
-      }
-      if (!this.guestName.trim() || !this.guestEmail.trim()) {
-        this.messages.add({
-          severity: 'warn',
-          summary: 'Dados incompletos',
-          detail: 'Informe pelo menos nome e e-mail.',
-        });
-        return;
-      }
+    if (this.auth.isLoggedIn()) {
+      this.step.set(2);
+      return;
     }
-    this.step.set(2);
+    if (this.identMode() === 'login') {
+      this.messages.add({
+        severity: 'warn',
+        summary: 'Entre na sua conta',
+        detail: 'Use o botão Entrar ou crie uma conta.',
+      });
+      return;
+    }
+    // criar conta e seguir logado
+    if (!this.guestName.trim() || !this.guestEmail.trim()) {
+      this.messages.add({
+        severity: 'warn',
+        summary: 'Dados incompletos',
+        detail: 'Informe nome e e-mail.',
+      });
+      return;
+    }
+    if (this.guestPassword.length < 6) {
+      this.messages.add({
+        severity: 'warn',
+        summary: 'Senha muito curta',
+        detail: 'A senha precisa de pelo menos 6 caracteres.',
+      });
+      return;
+    }
+    this.registering.set(true);
+    this.authApi
+      .customerRegister({
+        name: this.guestName.trim(),
+        email: this.guestEmail.trim(),
+        phone: this.guestPhone.trim() || undefined,
+        password: this.guestPassword,
+      })
+      .subscribe({
+        next: (resp) => {
+          this.auth.store(resp);
+          this.registering.set(false);
+          this.messages.add({ severity: 'success', summary: `Conta criada! Bem-vindo(a), ${resp.name}.` });
+          this.step.set(2);
+        },
+        error: (err) => {
+          this.registering.set(false);
+          this.messages.add({
+            severity: 'error',
+            summary: 'Não foi possível criar a conta',
+            detail: err?.error?.message ?? 'Tente outro e-mail ou faça login com "Já tenho conta".',
+          });
+        },
+      });
   }
 
   protected toStep3(): void {
