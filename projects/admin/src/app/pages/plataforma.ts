@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { PlatformApi, TenantOverview, TenantRow } from '@zentro/shared';
+import { PlatformApi, TenantDetail, TenantOverview, TenantRow, TenantUserRow } from '@zentro/shared';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
+import { CheckboxModule } from 'primeng/checkbox';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { TableModule } from 'primeng/table';
@@ -12,7 +13,10 @@ import { errMessage } from '../core/ui';
 
 @Component({
   selector: 'app-plataforma',
-  imports: [CommonModule, FormsModule, TableModule, TagModule, ButtonModule, DialogModule, InputTextModule],
+  imports: [
+    CommonModule, FormsModule, TableModule, TagModule, ButtonModule, DialogModule,
+    InputTextModule, CheckboxModule,
+  ],
   template: `
     <div class="page">
       <div class="page-head">
@@ -32,7 +36,7 @@ import { errMessage } from '../core/ui';
                 [severity]="t.status === 'ATIVO' ? 'success' : 'danger'"
               />
             </div>
-            <div class="muted-sm">{{ t.slug }}.localhost</div>
+            <div class="muted-sm">{{ primaryDomain(t.id) || t.slug }}</div>
             <div class="t-stats">
               <span>Pedidos hoje: <strong>{{ t.ordersToday }}</strong></span>
               <span>Vendas: <strong>{{ t.salesToday | currency: 'BRL' }}</strong></span>
@@ -50,7 +54,7 @@ import { errMessage } from '../core/ui';
               <th>Domínios</th>
               <th>Status</th>
               <th>Criada em</th>
-              <th style="width: 150px"></th>
+              <th style="width: 230px"></th>
             </tr>
           </ng-template>
           <ng-template #body let-t>
@@ -65,7 +69,14 @@ import { errMessage } from '../core/ui';
                 />
               </td>
               <td>{{ t.createdAt | date: 'dd/MM/yyyy' }}</td>
-              <td>
+              <td style="display:flex; gap:0.4rem">
+                <p-button
+                  label="Editar"
+                  icon="pi pi-pencil"
+                  size="small"
+                  [outlined]="true"
+                  (onClick)="openEdit(t)"
+                />
                 @if (t.status === 'ATIVO') {
                   <p-button
                     label="Suspender"
@@ -99,6 +110,7 @@ import { errMessage } from '../core/ui';
       </div>
     </div>
 
+    <!-- ====================== Nova loja ====================== -->
     <p-dialog
       header="Nova loja"
       [(visible)]="dialogVisible"
@@ -112,7 +124,7 @@ import { errMessage } from '../core/ui';
         </div>
         <div class="field f-5" style="grid-column: span 5">
           <label for="tslug">Slug *</label>
-          <input pInputText id="tslug" type="text" [(ngModel)]="form.slug" placeholder="minha-loja" />
+          <input pInputText id="tslug" type="text" [(ngModel)]="form.slug" placeholder="minhaloja" />
         </div>
         <div class="field f-12">
           <label for="taname">Nome do admin *</label>
@@ -151,7 +163,200 @@ import { errMessage } from '../core/ui';
         />
       </div>
     </p-dialog>
+
+    <!-- ====================== Editar loja ====================== -->
+    <p-dialog
+      header="Editar loja"
+      [(visible)]="editVisible"
+      [modal]="true"
+      [style]="{ width: '660px', maxWidth: '95vw' }"
+    >
+      @if (editing(); as t) {
+        <!-- Dados da loja -->
+        <h3 class="edit-section">Dados da loja</h3>
+        <div class="form-grid">
+          <div class="field f-8" style="grid-column: span 8">
+            <label for="ename">Nome da loja *</label>
+            <input pInputText id="ename" type="text" [(ngModel)]="editForm.name" />
+          </div>
+          <div class="field f-4" style="grid-column: span 4">
+            <label for="ecolor">Cor do tema</label>
+            <input
+              id="ecolor"
+              type="color"
+              [(ngModel)]="editForm.themeColor"
+              style="width: 100%; height: 38px; border: 1px solid var(--z-gray); border-radius: 8px; background: var(--z-surface); padding: 2px; cursor: pointer"
+            />
+          </div>
+        </div>
+        <div style="margin: 0.2rem 0 0.8rem">
+          <p-button
+            label="Salvar dados"
+            icon="pi pi-save"
+            size="small"
+            [loading]="savingTenant()"
+            [disabled]="!editForm.name"
+            (onClick)="saveTenant(t.id)"
+          />
+        </div>
+
+        <!-- Domínios -->
+        <h3 class="edit-section">Domínios</h3>
+        <div class="dom-list">
+          @for (d of t.domains; track d.id) {
+            <div class="dom-row">
+              <span class="dom-name">{{ d.domain }}</span>
+              @if (d.primary) {
+                <p-tag value="principal" severity="info" />
+              } @else {
+                <p-button
+                  label="Tornar principal"
+                  size="small"
+                  [text]="true"
+                  (onClick)="setPrimary(t.id, d.id)"
+                />
+              }
+              <span class="grow" style="flex:1"></span>
+              @if (t.domains.length > 1) {
+                <p-button
+                  icon="pi pi-trash"
+                  size="small"
+                  severity="danger"
+                  [text]="true"
+                  (onClick)="removeDomain(t.id, d.id)"
+                />
+              }
+            </div>
+          }
+        </div>
+        <div class="add-domain">
+          <input
+            pInputText
+            type="text"
+            [(ngModel)]="newDomain"
+            placeholder="loja.controlemaximo.com.br"
+            style="flex:1"
+          />
+          <p-button
+            label="Adicionar"
+            icon="pi pi-plus"
+            size="small"
+            [disabled]="!newDomain"
+            (onClick)="addDomain(t.id)"
+          />
+        </div>
+
+        <!-- Lojistas -->
+        <h3 class="edit-section">Usuários lojistas</h3>
+        @for (u of t.users; track u.id) {
+          <div class="user-edit">
+            <div class="form-grid" style="flex:1">
+              <div class="field f-6" style="grid-column: span 6">
+                <label>Nome</label>
+                <input pInputText type="text" [(ngModel)]="u.name" />
+              </div>
+              <div class="field f-6" style="grid-column: span 6">
+                <label>E-mail (login)</label>
+                <input pInputText type="email" [(ngModel)]="u.email" />
+              </div>
+            </div>
+            <div class="user-actions">
+              <label class="active-check">
+                <p-checkbox [(ngModel)]="u.active" [binary]="true" /> Ativo
+              </label>
+              <p-button label="Salvar" icon="pi pi-save" size="small" (onClick)="saveUser(t.id, u)" />
+              <p-button
+                label="Redefinir senha"
+                icon="pi pi-key"
+                size="small"
+                severity="secondary"
+                [outlined]="true"
+                (onClick)="openPassword(t.id, u)"
+              />
+            </div>
+          </div>
+        }
+      }
+      <div class="dialog-footer">
+        <p-button label="Fechar" severity="secondary" [text]="true" (onClick)="editVisible = false" />
+      </div>
+    </p-dialog>
+
+    <!-- ====================== Redefinir senha ====================== -->
+    <p-dialog
+      header="Redefinir senha"
+      [(visible)]="passwordVisible"
+      [modal]="true"
+      [style]="{ width: '420px', maxWidth: '95vw' }"
+    >
+      <p class="z-muted" style="margin-top:0">
+        Nova senha para <strong>{{ pwUserName }}</strong>.
+      </p>
+      <div class="field f-12">
+        <label for="newpass">Nova senha *</label>
+        <input pInputText id="newpass" type="password" [(ngModel)]="newPassword" />
+      </div>
+      <div class="dialog-footer">
+        <p-button label="Cancelar" severity="secondary" [text]="true" (onClick)="passwordVisible = false" />
+        <p-button
+          label="Salvar senha"
+          icon="pi pi-check"
+          [loading]="savingPassword()"
+          [disabled]="newPassword.length < 6"
+          (onClick)="savePassword()"
+        />
+      </div>
+    </p-dialog>
   `,
+  styles: [
+    `
+      .edit-section {
+        font-size: 0.95rem;
+        margin: 1rem 0 0.5rem;
+        padding-bottom: 0.3rem;
+        border-bottom: 1px solid var(--z-gray);
+      }
+      .dom-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+      .dom-row {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.4rem 0.2rem;
+      }
+      .dom-name {
+        font-family: monospace;
+      }
+      .add-domain {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.6rem;
+      }
+      .user-edit {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        align-items: flex-end;
+        padding: 0.6rem 0;
+        border-bottom: 1px dashed var(--z-gray);
+      }
+      .user-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .active-check {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.85rem;
+      }
+    `,
+  ],
 })
 export class PlataformaPage implements OnInit {
   private api = inject(PlatformApi);
@@ -165,6 +370,21 @@ export class PlataformaPage implements OnInit {
   dialogVisible = false;
   extraDomain = '';
   form = this.blank();
+
+  // edicao
+  readonly editing = signal<TenantDetail | null>(null);
+  editVisible = false;
+  editForm = { name: '', themeColor: '#2563EB' };
+  newDomain = '';
+  readonly savingTenant = signal(false);
+
+  // redefinir senha
+  passwordVisible = false;
+  pwTenantId = 0;
+  pwUserId = 0;
+  pwUserName = '';
+  newPassword = '';
+  readonly savingPassword = signal(false);
 
   ngOnInit(): void {
     this.reload();
@@ -186,6 +406,12 @@ export class PlataformaPage implements OnInit {
     this.api.overview().subscribe((list) => this.overview.set(list));
   }
 
+  primaryDomain(id: number): string {
+    return this.tenants().find((t) => t.id === id)?.domains?.[0] ?? '';
+  }
+
+  // ---------- nova loja ----------
+
   openNew(): void {
     this.form = this.blank();
     this.extraDomain = '';
@@ -200,10 +426,7 @@ export class PlataformaPage implements OnInit {
   create(): void {
     this.saving.set(true);
     this.api
-      .createTenant({
-        ...this.form,
-        domains: this.extraDomain ? [this.extraDomain] : undefined,
-      })
+      .createTenant({ ...this.form, domains: this.extraDomain ? [this.extraDomain] : undefined })
       .subscribe({
         next: (t) => {
           this.saving.set(false);
@@ -211,7 +434,7 @@ export class PlataformaPage implements OnInit {
           this.toast.add({
             severity: 'success',
             summary: 'Loja criada',
-            detail: `Acesse ${t.slug}.localhost para abrir a vitrine da loja.`,
+            detail: `Loja "${t.name}" criada. Edite-a para ajustar domínios se precisar.`,
             life: 8000,
           });
           this.reload();
@@ -222,6 +445,120 @@ export class PlataformaPage implements OnInit {
         },
       });
   }
+
+  // ---------- editar loja ----------
+
+  openEdit(t: TenantRow): void {
+    this.newDomain = '';
+    this.editVisible = true;
+    this.editing.set(null);
+    this.api.getTenant(t.id).subscribe({
+      next: (d) => {
+        this.editForm = { name: d.name, themeColor: d.themeColor ?? '#2563EB' };
+        this.editing.set(d);
+      },
+      error: (err) =>
+        this.toast.add({ severity: 'error', summary: 'Erro', detail: errMessage(err) }),
+    });
+  }
+
+  private applyDetail(d: TenantDetail): void {
+    this.editing.set(d);
+    this.reload();
+  }
+
+  saveTenant(id: number): void {
+    this.savingTenant.set(true);
+    this.api.updateTenant(id, { name: this.editForm.name, themeColor: this.editForm.themeColor }).subscribe({
+      next: (d) => {
+        this.savingTenant.set(false);
+        this.applyDetail(d);
+        this.toast.add({ severity: 'success', summary: 'Dados atualizados' });
+      },
+      error: (err) => {
+        this.savingTenant.set(false);
+        this.toast.add({ severity: 'error', summary: 'Erro', detail: errMessage(err) });
+      },
+    });
+  }
+
+  addDomain(id: number): void {
+    const domain = this.newDomain.trim();
+    if (!domain) return;
+    this.api.addDomain(id, domain).subscribe({
+      next: (d) => {
+        this.newDomain = '';
+        this.applyDetail(d);
+        this.toast.add({ severity: 'success', summary: 'Domínio adicionado' });
+      },
+      error: (err) =>
+        this.toast.add({ severity: 'error', summary: 'Erro', detail: errMessage(err) }),
+    });
+  }
+
+  setPrimary(id: number, domainId: number): void {
+    this.api.setPrimaryDomain(id, domainId).subscribe({
+      next: (d) => {
+        this.applyDetail(d);
+        this.toast.add({ severity: 'success', summary: 'Domínio principal atualizado' });
+      },
+      error: (err) =>
+        this.toast.add({ severity: 'error', summary: 'Erro', detail: errMessage(err) }),
+    });
+  }
+
+  removeDomain(id: number, domainId: number): void {
+    this.confirm.confirm({
+      header: 'Remover domínio',
+      message: 'Remover este domínio da loja? A vitrine deixará de responder por ele.',
+      icon: 'pi pi-exclamation-triangle',
+      acceptButtonProps: { label: 'Remover', severity: 'danger' },
+      rejectButtonProps: { label: 'Cancelar', severity: 'secondary', outlined: true },
+      accept: () =>
+        this.api.removeDomain(id, domainId).subscribe({
+          next: (d) => {
+            this.applyDetail(d);
+            this.toast.add({ severity: 'success', summary: 'Domínio removido' });
+          },
+          error: (err) =>
+            this.toast.add({ severity: 'error', summary: 'Erro', detail: errMessage(err) }),
+        }),
+    });
+  }
+
+  saveUser(id: number, u: TenantUserRow): void {
+    this.api.updateTenantUser(id, u.id, { name: u.name, email: u.email, active: u.active }).subscribe({
+      next: () => this.toast.add({ severity: 'success', summary: 'Lojista atualizado' }),
+      error: (err) =>
+        this.toast.add({ severity: 'error', summary: 'Erro', detail: errMessage(err) }),
+    });
+  }
+
+  openPassword(id: number, u: TenantUserRow): void {
+    this.pwTenantId = id;
+    this.pwUserId = u.id;
+    this.pwUserName = u.name;
+    this.newPassword = '';
+    this.passwordVisible = true;
+  }
+
+  savePassword(): void {
+    if (this.newPassword.length < 6) return;
+    this.savingPassword.set(true);
+    this.api.resetTenantUserPassword(this.pwTenantId, this.pwUserId, this.newPassword).subscribe({
+      next: () => {
+        this.savingPassword.set(false);
+        this.passwordVisible = false;
+        this.toast.add({ severity: 'success', summary: 'Senha redefinida' });
+      },
+      error: (err) => {
+        this.savingPassword.set(false);
+        this.toast.add({ severity: 'error', summary: 'Erro', detail: errMessage(err) });
+      },
+    });
+  }
+
+  // ---------- status ----------
 
   toggleStatus(t: TenantRow): void {
     const next = t.status === 'ATIVO' ? 'SUSPENSO' : 'ATIVO';

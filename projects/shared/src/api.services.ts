@@ -6,7 +6,7 @@ import {
   CustomerDetail, CustomerRow, Dashboard, DeliveryView, ImageMetaDto, LoginResponse,
   LowStockItem, MovementResponse, MovementType, OrderResponse, OrderStatus, Page,
   ProductCard, ProductDetail, ProductRequest, ProductResponse, SalesRow, SettingsDto,
-  StoreInfo, TenantOverview, TenantRow,
+  StoreInfo, TenantDetail, TenantOverview, TenantRow, TenantUserRow,
 } from './models';
 
 function params(obj: Record<string, unknown>): HttpParams {
@@ -227,11 +227,30 @@ export class PlatformApi {
       adminPassword: string; domains?: string[]; themeColor?: string }): Observable<TenantRow> {
     return this.http.post<TenantRow>('/api/platform/tenants', data);
   }
-  changeStatus(id: number, status: 'ATIVO' | 'SUSPENSO'): Observable<TenantRow> {
-    return this.http.patch<TenantRow>(`/api/platform/tenants/${id}/status`, { status });
+  getTenant(id: number): Observable<TenantDetail> {
+    return this.http.get<TenantDetail>(`/api/platform/tenants/${id}`);
   }
-  addDomain(id: number, domain: string): Observable<TenantRow> {
-    return this.http.post<TenantRow>(`/api/platform/tenants/${id}/domains`, { domain });
+  updateTenant(id: number, data: { name: string; themeColor?: string }): Observable<TenantDetail> {
+    return this.http.put<TenantDetail>(`/api/platform/tenants/${id}`, data);
+  }
+  changeStatus(id: number, status: 'ATIVO' | 'SUSPENSO'): Observable<TenantDetail> {
+    return this.http.patch<TenantDetail>(`/api/platform/tenants/${id}/status`, { status });
+  }
+  addDomain(id: number, domain: string): Observable<TenantDetail> {
+    return this.http.post<TenantDetail>(`/api/platform/tenants/${id}/domains`, { domain });
+  }
+  removeDomain(id: number, domainId: number): Observable<TenantDetail> {
+    return this.http.delete<TenantDetail>(`/api/platform/tenants/${id}/domains/${domainId}`);
+  }
+  setPrimaryDomain(id: number, domainId: number): Observable<TenantDetail> {
+    return this.http.patch<TenantDetail>(`/api/platform/tenants/${id}/domains/${domainId}/primary`, {});
+  }
+  updateTenantUser(id: number, userId: number,
+      data: { name: string; email: string; active?: boolean }): Observable<TenantUserRow> {
+    return this.http.put<TenantUserRow>(`/api/platform/tenants/${id}/users/${userId}`, data);
+  }
+  resetTenantUserPassword(id: number, userId: number, password: string): Observable<void> {
+    return this.http.post<void>(`/api/platform/tenants/${id}/users/${userId}/password`, { password });
   }
   overview(): Observable<TenantOverview[]> {
     return this.http.get<TenantOverview[]>('/api/platform/overview');

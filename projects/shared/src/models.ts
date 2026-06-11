@@ -405,3 +405,31 @@ export interface TenantOverview {
   ordersToday: number;
   salesToday: number;
 }
+
+export interface DomainDetail {
+  id: number;
+  domain: string;
+  primary: boolean;
+  verified: boolean;
+}
+
+export interface TenantUserRow {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
+}
+
+export interface TenantDetail {
+  id: number;
+  name: string;
+  slug: string;
+  schemaName: string;
+  status: string;
+  plan: string;
+  createdAt: string | null;
+  themeColor: string | null;
+  domains: DomainDetail[];
+  users: TenantUserRow[];
+}
