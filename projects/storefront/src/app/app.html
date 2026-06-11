@@ -1,0 +1,56 @@
+@if (storeSvc.notFound()) {
+  <div class="not-found">
+    <i class="pi pi-shop"></i>
+    <h1>Loja não encontrada</h1>
+    <p class="z-muted">
+      Não encontramos nenhuma loja neste endereço. Confira o link e tente novamente.
+    </p>
+  </div>
+} @else {
+  <header class="sf-header">
+    <div class="sf-header-inner">
+      <a routerLink="/" class="sf-logo">
+        @if (storeSvc.store()?.hasLogo) {
+          <img src="/api/store/logo" [alt]="storeSvc.store()?.storeName" />
+        } @else {
+          <span>{{ storeSvc.store()?.storeName || '…' }}</span>
+        }
+      </a>
+
+      <div class="sf-search">
+        <i class="pi pi-search"></i>
+        <input
+          pInputText
+          type="search"
+          placeholder="Buscar produtos…"
+          [(ngModel)]="searchTerm"
+          (keyup.enter)="search()"
+        />
+      </div>
+
+      <nav class="sf-nav">
+        <a routerLink="/carrinho" class="sf-cart" aria-label="Carrinho">
+          <i class="pi pi-shopping-cart"></i>
+          @if (cart.count() > 0) {
+            <span class="sf-cart-badge">{{ cart.count() }}</span>
+          }
+          <span class="sf-nav-label">Carrinho</span>
+        </a>
+        <a routerLink="/conta">
+          <i class="pi pi-user"></i>
+          <span class="sf-nav-label">Minha conta</span>
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="sf-main">
+    <router-outlet />
+  </main>
+
+  <footer class="sf-footer z-muted">
+    Powered by <strong>Zentro</strong>
+  </footer>
+}
+
+<p-toast position="top-center" />

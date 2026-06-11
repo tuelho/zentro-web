@@ -1,0 +1,74 @@
+/* ============================================================
+   Design tokens Zentro
+   Proposta A (clara)  -> :root          | tipografia Poppins
+   Proposta B (dark)   -> [data-theme="dark"]
+   ============================================================ */
+
+:root {
+  --z-navy: #0D1B2A;
+  --z-blue: #2563EB;
+  --z-green: #00C896;
+  --z-gray: #E6ECF1;
+  --z-bg: #F8FAFC;
+  --z-surface: #FFFFFF;
+  --z-fg: #0D1B2A;
+  --z-fg-muted: #5B6B7B;
+  --z-danger: #DC2626;
+  --z-warning: #D97706;
+  --z-radius: 10px;
+}
+
+[data-theme='dark'] {
+  --z-navy: #0A0F1A;
+  --z-blue: #6366F1;
+  --z-green: #22E3B6;
+  --z-gray: #1E293B;
+  --z-bg: #0A0F1A;
+  --z-surface: #111827;
+  --z-fg: #F5F7FA;
+  --z-fg-muted: #64748B;
+  --z-cyan: #06B6D4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--z-bg);
+  color: var(--z-fg);
+  font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+}
+
+a {
+  color: var(--z-blue);
+  text-decoration: none;
+}
+
+.z-card {
+  background: var(--z-surface);
+  border: 1px solid var(--z-gray);
+  border-radius: var(--z-radius);
+  padding: 1rem;
+}
+
+.z-muted {
+  color: var(--z-fg-muted);
+}
+
+.z-price {
+  color: var(--z-blue);
+  font-weight: 600;
+}
+
+.z-badge-success {
+  color: var(--z-green);
+  font-weight: 600;
+}
